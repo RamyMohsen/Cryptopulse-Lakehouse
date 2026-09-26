@@ -1,0 +1,28 @@
+{
+	"name": "ds_bronze_coinlist",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "Data Lake",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"dt": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "Json",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"fileName": "coins.json",
+				"folderPath": {
+					"value": "coin_list/@{dataset().dt}",
+					"type": "Expression"
+				},
+				"fileSystem": "bronze"
+			}
+		},
+		"schema": {}
+	}
+}

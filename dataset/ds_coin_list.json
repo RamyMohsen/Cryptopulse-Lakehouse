@@ -1,0 +1,32 @@
+{
+	"name": "ds_coin_list",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "CoinGecko REST",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"vs_currency": {
+				"type": "string",
+				"defaultValue": "usd"
+			},
+			"order": {
+				"type": "string",
+				"defaultValue": "market_cap_desc"
+			},
+			"per_page": {
+				"type": "string",
+				"defaultValue": "100"
+			}
+		},
+		"annotations": [],
+		"type": "RestResource",
+		"typeProperties": {
+			"relativeUrl": {
+				"value": "coins/markets?vs_currency=@{dataset().vs_currency}&order=@{dataset().order}&per_page=@{dataset().per_page}&page={page}",
+				"type": "Expression"
+			}
+		},
+		"schema": []
+	}
+}

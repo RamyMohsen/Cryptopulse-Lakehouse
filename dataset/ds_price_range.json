@@ -1,0 +1,29 @@
+{
+	"name": "ds_price_range",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "CoinGecko REST",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"id": {
+				"type": "string"
+			},
+			"from": {
+				"type": "string"
+			},
+			"to": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "RestResource",
+		"typeProperties": {
+			"relativeUrl": {
+				"value": "coins/@{dataset().id}/market_chart/range?vs_currency=usd&from=@{dataset().from}&to=@{dataset().to}",
+				"type": "Expression"
+			}
+		},
+		"schema": []
+	}
+}

@@ -1,0 +1,31 @@
+{
+	"name": "ds_bronze_prices",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "Data Lake",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"coinId": {
+				"type": "string"
+			},
+			"dt": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "Json",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"fileName": "prices.json",
+				"folderPath": {
+					"value": "prices/@{dataset().coinId}/@{dataset().dt}",
+					"type": "Expression"
+				},
+				"fileSystem": "bronze"
+			}
+		},
+		"schema": {}
+	}
+}

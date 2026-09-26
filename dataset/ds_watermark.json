@@ -1,0 +1,19 @@
+{
+	"name": "ds_watermark",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "Data Lake",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "Json",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"fileName": "watermark.json",
+				"fileSystem": "control"
+			}
+		},
+		"schema": {}
+	}
+}
