@@ -1,0 +1,15 @@
+{
+	"name": "adf-cryptopulse-dev",
+	"properties": {
+		"trustModeClaimForMi": {
+			"value": "Disabled",
+			"editable": true
+		}
+	},
+	"location": "germanywestcentral",
+	"identity": {
+		"type": "SystemAssigned",
+		"principalId": "68a152bb-aadf-498f-a045-8b8999e977a5",
+		"tenantId": "7325d34e-0b47-43dc-8eba-558dd48ada5a"
+	}
+}
