@@ -1,0 +1,35 @@
+{
+	"name": "df_bronze_to_silver",
+	"properties": {
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "ds_bronze",
+						"type": "DatasetReference"
+					},
+					"name": "srcBronze"
+				}
+			],
+			"sinks": [],
+			"transformations": [],
+			"scriptLines": [
+				"parameters{",
+				"     dt as string",
+				"}",
+				"source(output(",
+				"          coin_id as string,",
+				"          market_caps as double[][],",
+				"          prices as double[][],",
+				"          total_volumes as double[][]",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: true,",
+				"     documentForm: 'documentPerLine',",
+				"     wildcardPaths:[(\"prices/*/\"+$dt+\"/prices.json\")]) ~> srcBronze"
+			]
+		}
+	}
+}
