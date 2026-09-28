@@ -1,0 +1,57 @@
+{
+	"name": "ds_agg_gold",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "Data Lake",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "Parquet",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"folderPath": "coin_daily_metrics",
+				"fileSystem": "gold"
+			},
+			"compressionCodec": "snappy"
+		},
+		"schema": [
+			{
+				"name": "coin_id",
+				"type": "UTF8"
+			},
+			{
+				"name": "event_date",
+				"type": "DATE"
+			},
+			{
+				"name": "avg_price",
+				"type": "DOUBLE"
+			},
+			{
+				"name": "max_price",
+				"type": "DOUBLE"
+			},
+			{
+				"name": "min_price",
+				"type": "DOUBLE"
+			},
+			{
+				"name": "volatility",
+				"type": "DOUBLE"
+			},
+			{
+				"name": "avg_pct_change",
+				"type": "DOUBLE"
+			},
+			{
+				"name": "avg_market_cap",
+				"type": "DOUBLE"
+			},
+			{
+				"name": "avg_total_volume",
+				"type": "DOUBLE"
+			}
+		]
+	}
+}
