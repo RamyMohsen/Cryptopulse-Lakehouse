@@ -16,7 +16,7 @@
 				"userProperties": [],
 				"typeProperties": {
 					"items": {
-						"value": "@if(empty(pipeline().parameters.back_dates),[activity('Get Watermark').output.firstRow.lastRun], pipeline().parameters.back_dates)",
+						"value": "@if(\n    empty(pipeline().parameters.back_dates),\n    createArray(activity('Get Watermark').output.firstRow.lastRun),\n    pipeline().parameters.back_dates\n)",
 						"type": "Expression"
 					},
 					"isSequential": true,
