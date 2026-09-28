@@ -83,8 +83,6 @@
 			{
 				"name": "Notify Success",
 				"type": "WebActivity",
-				"state": "Inactive",
-				"onInactiveMarkAs": "Succeeded",
 				"dependsOn": [
 					{
 						"activity": "Execute Gold Pipeline",
@@ -100,26 +98,76 @@
 					"secureOutput": false,
 					"secureInput": false
 				},
-				"userProperties": []
+				"userProperties": [],
+				"typeProperties": {
+					"method": "POST",
+					"url": "https://prod-12.germanywestcentral.logic.azure.com:443/workflows/cd798580be6b4e2aa8c52ba7337fe292/triggers/When_an_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=eXIDdlRUQTvvI8xVdfWPNxZVd8E-ijl9H_eq_qgwBIk",
+					"body": {
+						"value": "{\"pipelineName\":\"@{pipeline().Pipeline}\",\"status\":\"Succeeded\",\"message\":\"Run completed\"}",
+						"type": "Expression"
+					}
+				}
 			},
 			{
-				"name": "Notify Failure",
+				"name": "Notify Gold Failure",
 				"type": "WebActivity",
-				"state": "Inactive",
-				"onInactiveMarkAs": "Succeeded",
 				"dependsOn": [
 					{
 						"activity": "Execute Gold Pipeline",
 						"dependencyConditions": [
 							"Failed"
 						]
-					},
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "POST",
+					"url": "https://prod-12.germanywestcentral.logic.azure.com:443/workflows/cd798580be6b4e2aa8c52ba7337fe292/triggers/When_an_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=eXIDdlRUQTvvI8xVdfWPNxZVd8E-ijl9H_eq_qgwBIk",
+					"body": {
+						"value": "{\n  \"pipelineName\": \"@{pipeline().Pipeline}\",\n  \"status\": \"Failed\",\n  \"message\": \"@{string(activity('Execute Gold Pipeline').error)}\"\n}",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Notify Silver Failure",
+				"type": "WebActivity",
+				"dependsOn": [
 					{
 						"activity": "Execute Silver Pipeline",
 						"dependencyConditions": [
 							"Failed"
 						]
-					},
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "POST",
+					"url": "https://prod-12.germanywestcentral.logic.azure.com:443/workflows/cd798580be6b4e2aa8c52ba7337fe292/triggers/When_an_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=eXIDdlRUQTvvI8xVdfWPNxZVd8E-ijl9H_eq_qgwBIk",
+					"body": {
+						"value": "{\n  \"pipelineName\": \"@{pipeline().Pipeline}\",\n  \"status\": \"Failed\",\n  \"message\": \"@{string(activity('Execute Silver Pipeline').error)}\"\n}",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Notify Bronze Failure",
+				"type": "WebActivity",
+				"dependsOn": [
 					{
 						"activity": "Execute Bronze Pipeline",
 						"dependencyConditions": [
@@ -134,7 +182,15 @@
 					"secureOutput": false,
 					"secureInput": false
 				},
-				"userProperties": []
+				"userProperties": [],
+				"typeProperties": {
+					"method": "POST",
+					"url": "https://prod-12.germanywestcentral.logic.azure.com:443/workflows/cd798580be6b4e2aa8c52ba7337fe292/triggers/When_an_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=eXIDdlRUQTvvI8xVdfWPNxZVd8E-ijl9H_eq_qgwBIk",
+					"body": {
+						"value": "{\n  \"pipelineName\": \"@{pipeline().Pipeline}\",\n  \"status\": \"Failed\",\n  \"message\": \"@{string(activity('Execute Bronze Pipeline').error)}\"\n}",
+						"type": "Expression"
+					}
+				}
 			}
 		],
 		"parameters": {
