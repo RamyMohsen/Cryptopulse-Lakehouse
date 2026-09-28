@@ -1,0 +1,88 @@
+{
+	"name": "df_silver_to_gold",
+	"properties": {
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"linkedService": {
+						"referenceName": "Data Lake",
+						"type": "LinkedServiceReference"
+					},
+					"name": "sourceSilver"
+				}
+			],
+			"sinks": [
+				{
+					"linkedService": {
+						"referenceName": "Data Lake",
+						"type": "LinkedServiceReference"
+					},
+					"name": "sinkGold"
+				}
+			],
+			"transformations": [
+				{
+					"name": "winlag"
+				},
+				{
+					"name": "derMetrics"
+				},
+				{
+					"name": "aggDaily"
+				},
+				{
+					"name": "arUpsert"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          coin_id as string,",
+				"          event_date as date,",
+				"          price as double,",
+				"          market_cap as double,",
+				"          total_volume as double",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false,",
+				"     format: 'delta',",
+				"     fileSystem: 'silver',",
+				"     folderPath: 'coin_prices') ~> sourceSilver",
+				"sourceSilver window(over(coin_id),",
+				"     asc(event_date, true),",
+				"     prev_price = lag(price,1)) ~> winlag",
+				"winlag derive(pct_change = iif(isNull(price), toDouble(0), round(toDouble((price-prev_price)/prev_price*100),2))) ~> derMetrics",
+				"derMetrics aggregate(groupBy(coin_id,",
+				"          event_date),",
+				"     avg_price = avg(price),",
+				"          max_price = max(price),",
+				"          min_price = min(price),",
+				"          volatility = stddev(price),",
+				"          avg_pct_change = avg(pct_change),",
+				"          avg_market_cap = avg(market_cap),",
+				"          avg_total_volume = avg(total_volume)) ~> aggDaily",
+				"aggDaily alterRow(upsertIf(1==1)) ~> arUpsert",
+				"arUpsert sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     format: 'delta',",
+				"     fileSystem: 'gold',",
+				"     folderPath: 'coin_daily_metrics',",
+				"     mergeSchema: false,",
+				"     autoCompact: false,",
+				"     optimizedWrite: false,",
+				"     vacuum: 0,",
+				"     deletable: false,",
+				"     insertable: false,",
+				"     updateable: false,",
+				"     upsertable: true,",
+				"     keys:['coin_id','event_date'],",
+				"     umask: 0022,",
+				"     preCommands: [],",
+				"     postCommands: [],",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> sinkGold"
+			]
+		}
+	}
+}
