@@ -1,0 +1,1527 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Data Factory name",
+			"defaultValue": "adf-cryptopulse-dev"
+		},
+		"Data Lake_accountKey": {
+			"type": "secureString",
+			"metadata": "Secure string for 'accountKey' of 'Data Lake'"
+		},
+		"CoinGecko REST_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://api.coingecko.com/api/v3"
+		},
+		"Data Lake_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://stcryptopulserm.dfs.core.windows.net/"
+		},
+		"tr_daily_6am_properties_pl_master_parameters_n_pages": {
+			"type": "string",
+			"defaultValue": "1"
+		},
+		"tr_daily_6am_properties_pl_master_parameters_per_page": {
+			"type": "string",
+			"defaultValue": "10"
+		},
+		"tr_daily_6am_properties_pl_master_parameters_back_dates": {
+			"type": "array",
+			"defaultValue": []
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/pl_agg_gold')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Check Silver Data",
+						"type": "GetMetadata",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataset": {
+								"referenceName": "ds_silver_prices",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"fieldList": [
+								"childItems"
+							],
+							"storeSettings": {
+								"type": "AzureBlobFSReadSettings",
+								"recursive": true,
+								"enablePartitionDiscovery": false
+							},
+							"formatSettings": {
+								"type": "ParquetReadSettings"
+							}
+						}
+					},
+					{
+						"name": "If Data Exist",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "Check Silver Data",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@greater(length(activity('Check Silver Data').output.childItems), 0)",
+								"type": "Expression"
+							},
+							"ifTrueActivities": [
+								{
+									"name": "df_silver_to_gold",
+									"type": "ExecuteDataFlow",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"dataflow": {
+											"referenceName": "df_silver_to_gold",
+											"type": "DataFlowReference",
+											"parameters": {},
+											"datasetParameters": {
+												"sourceSilver": {},
+												"sinkGold": {}
+											}
+										},
+										"staging": {},
+										"compute": {
+											"coreCount": 8,
+											"computeType": "General"
+										},
+										"traceLevel": "Fine"
+									}
+								}
+							]
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/ds_silver_prices')]",
+				"[concat(variables('factoryId'), '/dataflows/df_silver_to_gold')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/pl_data_flow_silver')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "ForEach1",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Get Watermark",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@if(\n    empty(pipeline().parameters.back_dates),\n    createArray(activity('Get Watermark').output.firstRow.lastRun),\n    pipeline().parameters.back_dates\n)",
+								"type": "Expression"
+							},
+							"isSequential": true,
+							"activities": [
+								{
+									"name": "df_bronze_to_silver",
+									"type": "ExecuteDataFlow",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"dataflow": {
+											"referenceName": "df_bronze_to_silver",
+											"type": "DataFlowReference",
+											"parameters": {
+												"dt": {
+													"value": "'@{item()}'",
+													"type": "Expression"
+												}
+											},
+											"datasetParameters": {
+												"srcBronze": {},
+												"sinkSilver": {}
+											}
+										},
+										"staging": {},
+										"compute": {
+											"coreCount": 8,
+											"computeType": "General"
+										},
+										"traceLevel": "None",
+										"cacheSinks": {
+											"firstRowOnly": true
+										}
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "Get Watermark",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"dataset": {
+								"referenceName": "ds_watermark",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"back_dates": {
+						"type": "array",
+						"defaultValue": []
+					}
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/ds_watermark')]",
+				"[concat(variables('factoryId'), '/dataflows/df_bronze_to_silver')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/pl_ingest_bronze')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Get Watermark",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"dataset": {
+								"referenceName": "ds_watermark",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						}
+					},
+					{
+						"name": "Loop Coins",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Get Top Coins",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('Get Top Coins').output.value",
+								"type": "Expression"
+							},
+							"isSequential": true,
+							"activities": [
+								{
+									"name": "Get Coin Price Range",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "RestSource",
+											"httpRequestTimeout": "00:01:40",
+											"requestInterval": "00.00:00:00.010",
+											"requestMethod": "GET",
+											"paginationRules": {
+												"supportRFC5988": "true"
+											}
+										},
+										"sink": {
+											"type": "JsonSink",
+											"storeSettings": {
+												"type": "AzureBlobFSWriteSettings"
+											},
+											"formatSettings": {
+												"type": "JsonWriteSettings"
+											}
+										},
+										"enableStaging": false
+									},
+									"inputs": [
+										{
+											"referenceName": "ds_price_range",
+											"type": "DatasetReference",
+											"parameters": {
+												"id": {
+													"value": "@item().id",
+													"type": "Expression"
+												},
+												"from": {
+													"value": "@div(\n    sub(ticks(activity('Get Watermark').output.firstRow.lastRun)\n    ,ticks('1970-01-01')),\n    10000000\n)",
+													"type": "Expression"
+												},
+												"to": {
+													"value": "@div(\n    sub(ticks(utcNow())\n    ,ticks('1970-01-01T00:00:00Z')),\n    10000000\n)",
+													"type": "Expression"
+												}
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "ds_bronze_prices",
+											"type": "DatasetReference",
+											"parameters": {
+												"coinId": {
+													"value": "@item().id\r\n",
+													"type": "Expression"
+												},
+												"dt": {
+													"value": "@formatDateTime(utcNow(),'yyyy-MM-dd')",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								}
+							]
+						}
+					},
+					{
+						"name": "Update Watermark",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Loop Coins",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"additionalColumns": [
+									{
+										"name": "lastRun",
+										"value": {
+											"value": "@formatDateTime(utcNow(),'yyyy-MM-dd')",
+											"type": "Expression"
+										}
+									}
+								],
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "JsonSink",
+								"storeSettings": {
+									"type": "AzureBlobFSWriteSettings"
+								},
+								"formatSettings": {
+									"type": "JsonWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "ds_empty",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "ds_watermark",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						]
+					},
+					{
+						"name": "Save Top Coins",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Get Watermark",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "RestSource",
+								"httpRequestTimeout": "00:01:40",
+								"requestInterval": "00.00:00:00.010",
+								"requestMethod": "GET",
+								"paginationRules": {
+									"QueryParameters.{page}": {
+										"value": "RANGE:1:@{pipeline().parameters.n_pages}:1",
+										"type": "Expression"
+									}
+								}
+							},
+							"sink": {
+								"type": "JsonSink",
+								"storeSettings": {
+									"type": "AzureBlobFSWriteSettings"
+								},
+								"formatSettings": {
+									"type": "JsonWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "ds_coin_list",
+								"type": "DatasetReference",
+								"parameters": {
+									"vs_currency": "usd",
+									"order": "market_cap_desc",
+									"per_page": {
+										"value": "@pipeline().parameters.per_page",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "ds_bronze_coinlist",
+								"type": "DatasetReference",
+								"parameters": {
+									"dt": {
+										"value": "@formatDateTime(utcNow(),'yyyy-MM-dd')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Get Top Coins",
+						"type": "Lookup",
+						"dependsOn": [
+							{
+								"activity": "Save Top Coins",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"dataset": {
+								"referenceName": "ds_bronze_coinlist",
+								"type": "DatasetReference",
+								"parameters": {
+									"dt": "@formatDateTime(utcNow(),'yyyy-MM-dd')"
+								}
+							},
+							"firstRowOnly": false
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"n_pages": {
+						"type": "string",
+						"defaultValue": "1"
+					},
+					"per_page": {
+						"type": "string",
+						"defaultValue": "10"
+					}
+				},
+				"variables": {
+					"New Watermark": {
+						"type": "String"
+					}
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/ds_watermark')]",
+				"[concat(variables('factoryId'), '/datasets/ds_empty')]",
+				"[concat(variables('factoryId'), '/datasets/ds_coin_list')]",
+				"[concat(variables('factoryId'), '/datasets/ds_bronze_coinlist')]",
+				"[concat(variables('factoryId'), '/datasets/ds_price_range')]",
+				"[concat(variables('factoryId'), '/datasets/ds_bronze_prices')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/pl_master')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Execute Bronze Pipeline",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "pl_ingest_bronze",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"n_pages": {
+									"value": "@pipeline().parameters.n_pages",
+									"type": "Expression"
+								},
+								"per_page": {
+									"value": "@pipeline().parameters.per_page",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "Execute Silver Pipeline",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Execute Bronze Pipeline",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "pl_processing_silver",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"back_dates": {
+									"value": "@pipeline().parameters.back_dates",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "Execute Gold Pipeline",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Execute Silver Pipeline",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "pl_agg_gold",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Notify Success",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "Execute Gold Pipeline",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "POST",
+							"headers": {},
+							"url": "https://prod-12.germanywestcentral.logic.azure.com:443/workflows/cd798580be6b4e2aa8c52ba7337fe292/triggers/When_an_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=eXIDdlRUQTvvI8xVdfWPNxZVd8E-ijl9H_eq_qgwBIk",
+							"body": {
+								"value": "{\"pipelineName\":\"@{pipeline().Pipeline}\",\"status\":\"Succeeded\",\"message\":\"Run completed\"}",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Notify Gold Failure",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "Execute Gold Pipeline",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "POST",
+							"headers": {},
+							"url": "https://prod-12.germanywestcentral.logic.azure.com:443/workflows/cd798580be6b4e2aa8c52ba7337fe292/triggers/When_an_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=eXIDdlRUQTvvI8xVdfWPNxZVd8E-ijl9H_eq_qgwBIk",
+							"body": {
+								"value": "{\n  \"pipelineName\": \"@{pipeline().Pipeline}\",\n  \"status\": \"Failed\",\n  \"message\": \"@{string(activity('Execute Gold Pipeline').error)}\"\n}",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Notify Silver Failure",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "Execute Silver Pipeline",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "POST",
+							"headers": {},
+							"url": "https://prod-12.germanywestcentral.logic.azure.com:443/workflows/cd798580be6b4e2aa8c52ba7337fe292/triggers/When_an_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=eXIDdlRUQTvvI8xVdfWPNxZVd8E-ijl9H_eq_qgwBIk",
+							"body": {
+								"value": "{\n  \"pipelineName\": \"@{pipeline().Pipeline}\",\n  \"status\": \"Failed\",\n  \"message\": \"@{string(activity('Execute Silver Pipeline').error)}\"\n}",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Notify Bronze Failure",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "Execute Bronze Pipeline",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "POST",
+							"headers": {},
+							"url": "https://prod-12.germanywestcentral.logic.azure.com:443/workflows/cd798580be6b4e2aa8c52ba7337fe292/triggers/When_an_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=eXIDdlRUQTvvI8xVdfWPNxZVd8E-ijl9H_eq_qgwBIk",
+							"body": {
+								"value": "{\n  \"pipelineName\": \"@{pipeline().Pipeline}\",\n  \"status\": \"Failed\",\n  \"message\": \"@{string(activity('Execute Bronze Pipeline').error)}\"\n}",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"n_pages": {
+						"type": "string",
+						"defaultValue": "1"
+					},
+					"per_page": {
+						"type": "string",
+						"defaultValue": "10"
+					},
+					"back_dates": {
+						"type": "array",
+						"defaultValue": []
+					}
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/pl_ingest_bronze')]",
+				"[concat(variables('factoryId'), '/pipelines/pl_processing_silver')]",
+				"[concat(variables('factoryId'), '/pipelines/pl_agg_gold')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/pl_processing_silver')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Check Bronze Data",
+						"type": "GetMetadata",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataset": {
+								"referenceName": "ds_bronze",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"fieldList": [
+								"childItems"
+							],
+							"storeSettings": {
+								"type": "AzureBlobFSReadSettings",
+								"recursive": true,
+								"enablePartitionDiscovery": false
+							},
+							"formatSettings": {
+								"type": "JsonReadSettings"
+							}
+						}
+					},
+					{
+						"name": "If Data Exist",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "Check Bronze Data",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@greater(length(activity('Check Bronze Data').output.childItems), 0)",
+								"type": "Expression"
+							},
+							"ifTrueActivities": [
+								{
+									"name": "Execute Data Flow PL",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"policy": {
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "pl_data_flow_silver",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"back_dates": {
+												"value": "@pipeline().parameters.back_dates",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"back_dates": {
+						"type": "array",
+						"defaultValue": []
+					}
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/ds_bronze')]",
+				"[concat(variables('factoryId'), '/pipelines/pl_data_flow_silver')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ds_agg_gold')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "Data Lake",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "Parquet",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"folderPath": "coin_daily_metrics",
+						"fileSystem": "gold"
+					},
+					"compressionCodec": "snappy"
+				},
+				"schema": [
+					{
+						"name": "coin_id",
+						"type": "UTF8"
+					},
+					{
+						"name": "event_date",
+						"type": "DATE"
+					},
+					{
+						"name": "avg_price",
+						"type": "DOUBLE"
+					},
+					{
+						"name": "max_price",
+						"type": "DOUBLE"
+					},
+					{
+						"name": "min_price",
+						"type": "DOUBLE"
+					},
+					{
+						"name": "volatility",
+						"type": "DOUBLE"
+					},
+					{
+						"name": "avg_pct_change",
+						"type": "DOUBLE"
+					},
+					{
+						"name": "avg_market_cap",
+						"type": "DOUBLE"
+					},
+					{
+						"name": "avg_total_volume",
+						"type": "DOUBLE"
+					}
+				]
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/Data Lake')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ds_bronze')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "Data Lake",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "Json",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"folderPath": "prices",
+						"fileSystem": "bronze"
+					}
+				},
+				"schema": {}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/Data Lake')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ds_bronze_coinlist')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "Data Lake",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"dt": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "Json",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": "coins.json",
+						"folderPath": {
+							"value": "coin_list/@{dataset().dt}",
+							"type": "Expression"
+						},
+						"fileSystem": "bronze"
+					}
+				},
+				"schema": {}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/Data Lake')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ds_bronze_prices')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "Data Lake",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"coinId": {
+						"type": "string"
+					},
+					"dt": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "Json",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": "prices.json",
+						"folderPath": {
+							"value": "prices/@{dataset().coinId}/@{dataset().dt}",
+							"type": "Expression"
+						},
+						"fileSystem": "bronze"
+					}
+				},
+				"schema": {}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/Data Lake')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ds_coin_list')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "CoinGecko REST",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"vs_currency": {
+						"type": "string",
+						"defaultValue": "usd"
+					},
+					"order": {
+						"type": "string",
+						"defaultValue": "market_cap_desc"
+					},
+					"per_page": {
+						"type": "string",
+						"defaultValue": "100"
+					}
+				},
+				"annotations": [],
+				"type": "RestResource",
+				"typeProperties": {
+					"relativeUrl": {
+						"value": "coins/markets?vs_currency=@{dataset().vs_currency}&order=@{dataset().order}&per_page=@{dataset().per_page}&page={page}",
+						"type": "Expression"
+					}
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/CoinGecko REST')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ds_empty')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "Data Lake",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "Json",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": "empty.json",
+						"fileSystem": "control"
+					}
+				},
+				"schema": {}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/Data Lake')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ds_price_range')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "CoinGecko REST",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"id": {
+						"type": "string"
+					},
+					"from": {
+						"type": "string"
+					},
+					"to": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "RestResource",
+				"typeProperties": {
+					"relativeUrl": {
+						"value": "coins/@{dataset().id}/market_chart/range?vs_currency=usd&from=@{dataset().from}&to=@{dataset().to}",
+						"type": "Expression"
+					}
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/CoinGecko REST')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ds_silver_prices')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "Data Lake",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "Parquet",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"folderPath": "coin_prices",
+						"fileSystem": "silver"
+					},
+					"compressionCodec": "snappy"
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/Data Lake')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ds_watermark')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "Data Lake",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "Json",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": "watermark.json",
+						"fileSystem": "control"
+					}
+				},
+				"schema": {}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/Data Lake')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/CoinGecko REST')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "RestService",
+				"typeProperties": {
+					"url": "[parameters('CoinGecko REST_properties_typeProperties_url')]",
+					"enableServerCertificateValidation": true,
+					"authenticationType": "Anonymous"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Data Lake')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureBlobFS",
+				"typeProperties": {
+					"url": "[parameters('Data Lake_properties_typeProperties_url')]",
+					"accountKey": {
+						"type": "SecureString",
+						"value": "[parameters('Data Lake_accountKey')]"
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/tr_daily_6am')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"runtimeState": "Started",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "pl_master",
+							"type": "PipelineReference"
+						},
+						"parameters": {
+							"n_pages": "[parameters('tr_daily_6am_properties_pl_master_parameters_n_pages')]",
+							"per_page": "[parameters('tr_daily_6am_properties_pl_master_parameters_per_page')]",
+							"back_dates": "[parameters('tr_daily_6am_properties_pl_master_parameters_back_dates')]"
+						}
+					}
+				],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Day",
+						"interval": 1,
+						"startTime": "2026-09-28T18:00:00",
+						"timeZone": "Egypt Standard Time",
+						"schedule": {
+							"minutes": [
+								0
+							],
+							"hours": [
+								6
+							]
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/pl_master')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/df_bronze_to_silver')]",
+			"type": "Microsoft.DataFactory/factories/dataflows",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "ds_bronze",
+								"type": "DatasetReference"
+							},
+							"name": "srcBronze"
+						}
+					],
+					"sinks": [
+						{
+							"linkedService": {
+								"referenceName": "Data Lake",
+								"type": "LinkedServiceReference"
+							},
+							"name": "sinkSilver"
+						}
+					],
+					"transformations": [
+						{
+							"name": "flMarketCap"
+						},
+						{
+							"name": "flTotalVolume"
+						},
+						{
+							"name": "flPrices"
+						},
+						{
+							"name": "derCleanP"
+						},
+						{
+							"name": "derCleanMC"
+						},
+						{
+							"name": "derCleanTV"
+						},
+						{
+							"name": "join1"
+						},
+						{
+							"name": "join2"
+						},
+						{
+							"name": "selectCleanCols"
+						},
+						{
+							"name": "arUpsert"
+						}
+					],
+					"scriptLines": [
+						"parameters{",
+						"     dt as string",
+						"}",
+						"source(output(",
+						"          coin_id as string,",
+						"          market_caps as double[][],",
+						"          prices as double[][],",
+						"          total_volumes as double[][]",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     ignoreNoFilesFound: true,",
+						"     documentForm: 'documentPerLine',",
+						"     wildcardPaths:[(\"prices/*/\"+$dt+\"/prices.json\")]) ~> srcBronze",
+						"srcBronze foldDown(unroll(market_caps),",
+						"     mapColumn(",
+						"          coin_id,",
+						"          market_caps",
+						"     ),",
+						"     skipDuplicateMapInputs: false,",
+						"     skipDuplicateMapOutputs: false) ~> flMarketCap",
+						"srcBronze foldDown(unroll(total_volumes),",
+						"     mapColumn(",
+						"          coin_id,",
+						"          total_volumes",
+						"     ),",
+						"     skipDuplicateMapInputs: false,",
+						"     skipDuplicateMapOutputs: false) ~> flTotalVolume",
+						"srcBronze foldDown(unroll(prices),",
+						"     mapColumn(",
+						"          coin_id,",
+						"          prices",
+						"     ),",
+						"     skipDuplicateMapInputs: false,",
+						"     skipDuplicateMapOutputs: false) ~> flPrices",
+						"flPrices derive(event_date = toDate(toTimestamp(toLong(prices[1]))),",
+						"          price = prices[2]) ~> derCleanP",
+						"flMarketCap derive(event_date = toDate(toTimestamp(toLong(market_caps[1]))),",
+						"          market_cap = market_caps[2]) ~> derCleanMC",
+						"flTotalVolume derive(event_date = toDate(toTimestamp(toLong(total_volumes[1]))),",
+						"          total_volume = total_volumes[2]) ~> derCleanTV",
+						"derCleanP, derCleanMC join(flPrices@coin_id == flMarketCap@coin_id",
+						"     && derCleanP@event_date == derCleanMC@event_date,",
+						"     joinType:'left',",
+						"     matchType:'exact',",
+						"     ignoreSpaces: false,",
+						"     broadcast: 'auto')~> join1",
+						"join1, derCleanTV join(flPrices@coin_id == flTotalVolume@coin_id",
+						"     && derCleanP@event_date == derCleanTV@event_date,",
+						"     joinType:'left',",
+						"     matchType:'exact',",
+						"     ignoreSpaces: false,",
+						"     broadcast: 'auto')~> join2",
+						"join2 select(mapColumn(",
+						"          coin_id = flPrices@coin_id,",
+						"          event_date = derCleanP@event_date,",
+						"          price,",
+						"          market_cap,",
+						"          total_volume",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> selectCleanCols",
+						"selectCleanCols alterRow(upsertIf(1==1)) ~> arUpsert",
+						"arUpsert sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     format: 'delta',",
+						"     fileSystem: 'silver',",
+						"     folderPath: 'coin_prices',",
+						"     mergeSchema: false,",
+						"     autoCompact: false,",
+						"     optimizedWrite: false,",
+						"     vacuum: 0,",
+						"     deletable: false,",
+						"     insertable: false,",
+						"     updateable: false,",
+						"     upsertable: true,",
+						"     keys:['coin_id','event_date'],",
+						"     umask: 0022,",
+						"     preCommands: [],",
+						"     postCommands: [],",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> sinkSilver"
+					]
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/ds_bronze')]",
+				"[concat(variables('factoryId'), '/linkedServices/Data Lake')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/df_silver_to_gold')]",
+			"type": "Microsoft.DataFactory/factories/dataflows",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"linkedService": {
+								"referenceName": "Data Lake",
+								"type": "LinkedServiceReference"
+							},
+							"name": "sourceSilver"
+						}
+					],
+					"sinks": [
+						{
+							"linkedService": {
+								"referenceName": "Data Lake",
+								"type": "LinkedServiceReference"
+							},
+							"name": "sinkGold"
+						}
+					],
+					"transformations": [
+						{
+							"name": "winlag"
+						},
+						{
+							"name": "derMetrics"
+						},
+						{
+							"name": "aggDaily"
+						},
+						{
+							"name": "arUpsert"
+						}
+					],
+					"scriptLines": [
+						"source(output(",
+						"          coin_id as string,",
+						"          event_date as date,",
+						"          price as double,",
+						"          market_cap as double,",
+						"          total_volume as double",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     ignoreNoFilesFound: false,",
+						"     format: 'delta',",
+						"     fileSystem: 'silver',",
+						"     folderPath: 'coin_prices') ~> sourceSilver",
+						"sourceSilver window(over(coin_id),",
+						"     asc(event_date, true),",
+						"     prev_price = lag(price,1)) ~> winlag",
+						"winlag derive(pct_change = iif(isNull(price), toDouble(0), round(toDouble((price-prev_price)/prev_price*100),2))) ~> derMetrics",
+						"derMetrics aggregate(groupBy(coin_id,",
+						"          event_date),",
+						"     avg_price = avg(price),",
+						"          max_price = max(price),",
+						"          min_price = min(price),",
+						"          volatility = stddev(price),",
+						"          avg_pct_change = avg(pct_change),",
+						"          avg_market_cap = avg(market_cap),",
+						"          avg_total_volume = avg(total_volume)) ~> aggDaily",
+						"aggDaily alterRow(upsertIf(1==1)) ~> arUpsert",
+						"arUpsert sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     format: 'delta',",
+						"     fileSystem: 'gold',",
+						"     folderPath: 'coin_daily_metrics',",
+						"     mergeSchema: false,",
+						"     autoCompact: false,",
+						"     optimizedWrite: false,",
+						"     vacuum: 0,",
+						"     deletable: false,",
+						"     insertable: false,",
+						"     updateable: false,",
+						"     upsertable: true,",
+						"     keys:['coin_id','event_date'],",
+						"     umask: 0022,",
+						"     preCommands: [],",
+						"     postCommands: [],",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> sinkGold"
+					]
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/Data Lake')]"
+			]
+		}
+	]
+}

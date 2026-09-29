@@ -1,0 +1,33 @@
+{
+	"$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"value": "adf-cryptopulse-dev"
+		},
+		"Data Lake_accountKey": {
+			"value": ""
+		},
+		"CoinGecko REST_properties_typeProperties_url": {
+			"value": "https://api.coingecko.com/api/v3"
+		},
+		"Data Lake_properties_typeProperties_url": {
+			"value": "https://stcryptopulserm.dfs.core.windows.net/"
+		},
+		"tr_daily_6am_properties_pl_master_parameters_n_pages": {
+			"value": "1"
+		},
+		"tr_daily_6am_properties_pl_master_parameters_per_page": {
+			"value": "10"
+		},
+		"tr_daily_6am_properties_pl_master_parameters_back_dates": {
+			"value": []
+		},
+		"containerUri": {
+			"value": ""
+		},
+		"containerSasToken": {
+			"value": ""
+		}
+	}
+}

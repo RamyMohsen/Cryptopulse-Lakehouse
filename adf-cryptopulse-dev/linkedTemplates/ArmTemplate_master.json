@@ -1,0 +1,84 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Data Factory name",
+			"defaultValue": "adf-cryptopulse-dev"
+		},
+		"Data Lake_accountKey": {
+			"type": "secureString",
+			"metadata": "Secure string for 'accountKey' of 'Data Lake'"
+		},
+		"CoinGecko REST_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://api.coingecko.com/api/v3"
+		},
+		"Data Lake_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://stcryptopulserm.dfs.core.windows.net/"
+		},
+		"tr_daily_6am_properties_pl_master_parameters_n_pages": {
+			"type": "string",
+			"defaultValue": "1"
+		},
+		"tr_daily_6am_properties_pl_master_parameters_per_page": {
+			"type": "string",
+			"defaultValue": "10"
+		},
+		"tr_daily_6am_properties_pl_master_parameters_back_dates": {
+			"type": "array",
+			"defaultValue": []
+		},
+		"containerUri": {
+			"type": "string",
+			"metadata": "URI to storage account containing linked ARM templates"
+		},
+		"containerSasToken": {
+			"type": "string",
+			"metadata": "Sas token to storage account containing linked ARM templates"
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "adf-cryptopulse-dev_ArmTemplate_0",
+			"type": "Microsoft.Resources/deployments",
+			"apiVersion": "2024-03-01",
+			"properties": {
+				"mode": "incremental",
+				"templateLink": {
+					"uri": "[concat(parameters('containerUri'), '/ArmTemplate_0.json', parameters('containerSasToken'))]",
+					"contentVersion": "1.0.0.0"
+				},
+				"parameters": {
+					"factoryName": {
+						"value": "[parameters('factoryName')]"
+					},
+					"Data Lake_accountKey": {
+						"value": "[parameters('Data Lake_accountKey')]"
+					},
+					"CoinGecko REST_properties_typeProperties_url": {
+						"value": "[parameters('CoinGecko REST_properties_typeProperties_url')]"
+					},
+					"Data Lake_properties_typeProperties_url": {
+						"value": "[parameters('Data Lake_properties_typeProperties_url')]"
+					},
+					"tr_daily_6am_properties_pl_master_parameters_n_pages": {
+						"value": "[parameters('tr_daily_6am_properties_pl_master_parameters_n_pages')]"
+					},
+					"tr_daily_6am_properties_pl_master_parameters_per_page": {
+						"value": "[parameters('tr_daily_6am_properties_pl_master_parameters_per_page')]"
+					},
+					"tr_daily_6am_properties_pl_master_parameters_back_dates": {
+						"value": "[parameters('tr_daily_6am_properties_pl_master_parameters_back_dates')]"
+					}
+				}
+			},
+			"dependsOn": []
+		}
+	]
+}
