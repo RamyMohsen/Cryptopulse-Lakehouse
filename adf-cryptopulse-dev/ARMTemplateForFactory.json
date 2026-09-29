@@ -694,7 +694,7 @@
 							"headers": {},
 							"url": "https://prod-12.germanywestcentral.logic.azure.com:443/workflows/cd798580be6b4e2aa8c52ba7337fe292/triggers/When_an_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=eXIDdlRUQTvvI8xVdfWPNxZVd8E-ijl9H_eq_qgwBIk",
 							"body": {
-								"value": "{\"pipelineName\":\"@{pipeline().Pipeline}\",\"status\":\"Succeeded\",\"message\":\"Run completed\"}",
+								"value": "@json(concat(\n    '{\"pipelineName\":\"',\n    pipeline().Pipeline,\n    '\",\"status\":\"Succeeded\",\"message\":\"CryptoPulse pipeline completed successfully.\"}'\n))",
 								"type": "Expression"
 							}
 						}
@@ -723,7 +723,7 @@
 							"headers": {},
 							"url": "https://prod-12.germanywestcentral.logic.azure.com:443/workflows/cd798580be6b4e2aa8c52ba7337fe292/triggers/When_an_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=eXIDdlRUQTvvI8xVdfWPNxZVd8E-ijl9H_eq_qgwBIk",
 							"body": {
-								"value": "{\n  \"pipelineName\": \"@{pipeline().Pipeline}\",\n  \"status\": \"Failed\",\n  \"message\": \"@{string(activity('Execute Gold Pipeline').error)}\"\n}",
+								"value": "@json(concat(\n    '{\"pipelineName\":\"',\n    pipeline().Pipeline,\n    '\",\"status\":\"Failed\",\"message\":',\n    string(activity('Execute Gold Pipeline').error),\n    '}'\n))",
 								"type": "Expression"
 							}
 						}
@@ -752,7 +752,7 @@
 							"headers": {},
 							"url": "https://prod-12.germanywestcentral.logic.azure.com:443/workflows/cd798580be6b4e2aa8c52ba7337fe292/triggers/When_an_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=eXIDdlRUQTvvI8xVdfWPNxZVd8E-ijl9H_eq_qgwBIk",
 							"body": {
-								"value": "{\n  \"pipelineName\": \"@{pipeline().Pipeline}\",\n  \"status\": \"Failed\",\n  \"message\": \"@{string(activity('Execute Silver Pipeline').error)}\"\n}",
+								"value": "@json(concat(\n    '{\"pipelineName\":\"',\n    pipeline().Pipeline,\n    '\",\"status\":\"Failed\",\"message\":',\n    string(activity('Execute Silver Pipeline').error),\n    '}'\n))",
 								"type": "Expression"
 							}
 						}
@@ -781,7 +781,7 @@
 							"headers": {},
 							"url": "https://prod-12.germanywestcentral.logic.azure.com:443/workflows/cd798580be6b4e2aa8c52ba7337fe292/triggers/When_an_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=eXIDdlRUQTvvI8xVdfWPNxZVd8E-ijl9H_eq_qgwBIk",
 							"body": {
-								"value": "{\n  \"pipelineName\": \"@{pipeline().Pipeline}\",\n  \"status\": \"Failed\",\n  \"message\": \"@{string(activity('Execute Bronze Pipeline').error)}\"\n}",
+								"value": "@json(concat(\n    '{\"pipelineName\":\"',\n    pipeline().Pipeline,\n    '\",\"status\":\"Failed\",\"message\":',\n    string(activity('Execute Bronze Pipeline').error),\n    '}'\n))",
 								"type": "Expression"
 							}
 						}
